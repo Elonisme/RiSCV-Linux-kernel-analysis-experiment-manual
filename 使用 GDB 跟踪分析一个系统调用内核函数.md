@@ -1,4 +1,4 @@
-# 分析 system_call 中断处理过程
+# 使用 GDB 跟踪分析一个系统调用内核函数
 
 ## MenuOS迁移到RISC-V架构
 
