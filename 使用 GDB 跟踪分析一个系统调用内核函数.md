@@ -174,7 +174,7 @@ chmod +x start-gdb.sh
 
 ![image-20231105221503598](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231105221503598.png)
 
-另开一个终端，进入menu的目录下，使用以下命令启动 `gdb-multiarch ` 。
+另开一个终端，进入MenuOS的目录下，使用以下命令启动 `gdb-multiarch ` 。
 
 ```bash
 gdb-multiarch linux-5.19.16/vmlinux
@@ -196,4 +196,37 @@ layout split
 
 ![image-20231105221933745](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231105221933745.png)
 
+此时，将启动 `gdb-multiarch` 的终端和启动 `./start-gdb.sh` 的终端分别分屏左右，方便查看调试过程中的程序的输出，如下图所示：
+
+![image-20231106161606896](/home/elon/.config/Typora/typora-user-images/image-20231106161606896.png)
+
+执行上面打断点的操作后，在右侧图中的的最后一行显示：`[    0.507884] Run /init as init process` 说明Linux 内核已经初始化完成。
+现在使用 十一次 `c` 命令，使得MenuOS加载到shell，如下图所示：
+
+![image-20231106162535743](/home/elon/.config/Typora/typora-user-images/image-20231106162535743.png)
+
+现在在MenuOS中输入 ` write-asm` 回车之后, MenuOS将会暂停输出。然后在左侧gdb窗口中输入命令 `c` ，MenuOS将会显示以下信息：
+
+![image-20231106162854338](/home/elon/.config/Typora/typora-user-images/image-20231106162854338.png)
+
+开始调试 `WriteAsm` 函数，使用 `si` 命令后，程序停留在 `SYSCALL_DEFINE3` 的函数中的返回语句 `return ksys_write(fd, buf, count); ` ，如下图所示：
+
+![image-20231106162942747](/home/elon/.config/Typora/typora-user-images/image-20231106162942747.png)
+
+继续使用 `si` 命令，将程序将执行下一条汇编语句，如下图所示：
+
+![image-20231106163210213](/home/elon/.config/Typora/typora-user-images/image-20231106163210213.png)
+
+基本上调用过程如下：
+
+```mermaid
+graph TD;
+   SYSCALL_DEFINE3-->ksys_write;
+   ksys_write--> ret;
+   ret-->SYSCALL_DEFINE3;
+```
+
+程序先执行到 ` SYSCALL_DEFINE3` 函数， 然后调用唯一的返回语句中的 `ksys_write` 函数， 之后执行 `ksys_write` 函数的内容，最后返回到 `SYSCALL_DEFINE3` 函数
+
 ## system_call 中断分析（王瑞）
+
