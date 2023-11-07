@@ -198,24 +198,24 @@ layout split
 
 此时，将启动 `gdb-multiarch` 的终端和启动 `./start-gdb.sh` 的终端分别分屏左右，方便查看调试过程中的程序的输出，如下图所示：
 
-![image-20231106161606896](/home/elon/.config/Typora/typora-user-images/image-20231106161606896.png)
+![image-20231106161606896](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231106161606896.png)
 
 执行上面打断点的操作后，在右侧图中的的最后一行显示：`[    0.507884] Run /init as init process` 说明Linux 内核已经初始化完成。
 现在使用 十一次 `c` 命令，使得MenuOS加载到shell，如下图所示：
 
-![image-20231106162535743](/home/elon/.config/Typora/typora-user-images/image-20231106162535743.png)
+![image-20231106162535743](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231106162535743.png)
 
 现在在MenuOS中输入 ` write-asm` 回车之后, MenuOS将会暂停输出。然后在左侧gdb窗口中输入命令 `c` ，MenuOS将会显示以下信息：
 
-![image-20231106162854338](/home/elon/.config/Typora/typora-user-images/image-20231106162854338.png)
+![image-20231106162854338](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231106162854338.png)
 
 开始调试 `WriteAsm` 函数，使用 `si` 命令后，程序停留在 `SYSCALL_DEFINE3` 的函数中的返回语句 `return ksys_write(fd, buf, count); ` ，如下图所示：
 
-![image-20231106162942747](/home/elon/.config/Typora/typora-user-images/image-20231106162942747.png)
+![image-20231106162942747](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231106162942747.png)
 
 继续使用 `si` 命令，将程序将执行下一条汇编语句，如下图所示：
 
-![image-20231106163210213](/home/elon/.config/Typora/typora-user-images/image-20231106163210213.png)
+![image-20231106163210213](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231106163210213.png)
 
 基本上调用过程如下：
 
