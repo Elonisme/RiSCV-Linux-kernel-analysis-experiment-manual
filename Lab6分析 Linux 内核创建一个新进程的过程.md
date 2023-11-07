@@ -29,7 +29,7 @@
 
 在 `RISC-V Linux` 系统中没有定义 `fork` 系统调用，只在`include/uapi/asm-generic/unistd.h`定义了 `clone` 系统调用, 对于的内核处理函数为220号系统调用 `sys_clone`。
 
-![image-20231107202345288](/home/elon/.config/Typora/typora-user-images/image-20231107202345288.png)
+![image-20231107202345288](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231107202345288.png)
 
 在Linux 5.19.16中这些创建进程的系统调用都是在kernel/fork, 文件中实现的，代码如下：
 
@@ -300,40 +300,40 @@ MenuConfig("fork-new", "fork new process", ForkProcess);
 
 然后依次打入 `sys_clone` 、 `kernel_clone` 、 `dup_task_struct` 、 `copy_process` 、`copy_thread` 、 `ret_from_fork` 的断点。
 
-![image-20231107213842226](/home/elon/.config/Typora/typora-user-images/image-20231107213842226.png)
+![image-20231107213842226](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231107213842226.png)
 
 从上图中可以发现 `do_fork` 这个函数的确已经在5.19.16的内核删除，并使用kernel_clone代替了。
 
 待程序成功加载Menuos后，在MenuOS中输入 `fork-new` 使用 `ForkProcess` 函数创建新的进程。
 
-![image-20231107214310340](/home/elon/.config/Typora/typora-user-images/image-20231107214310340.png)
+![image-20231107214310340](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231107214310340.png)
 
 首先启动的是__se_sys_clone,如下图所示：
 
-![image-20231107215732335](/home/elon/.config/Typora/typora-user-images/image-20231107215732335.png)
+![image-20231107215732335](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231107215732335.png)
 
 然后启动的是kernel_clone：
 
-![image-20231107215834035](/home/elon/.config/Typora/typora-user-images/image-20231107215834035.png)
+![image-20231107215834035](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231107215834035.png)
 
 接着是copy_process:
 
-![image-20231107215857474](/home/elon/.config/Typora/typora-user-images/image-20231107215857474.png)
+![image-20231107215857474](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231107215857474.png)
 
 然后开始复制所有的进程信息
 
-![image-20231107214335881](/home/elon/.config/Typora/typora-user-images/image-20231107214335881.png)
+![image-20231107214335881](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231107214335881.png)
 
 接着进入copy_thread
 
-![image-20231107214346193](/home/elon/.config/Typora/typora-user-images/image-20231107214346193.png)
+![image-20231107214346193](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231107214346193.png)
 
 最后返回子进程
 
-![image-20231107214357751](/home/elon/.config/Typora/typora-user-images/image-20231107214357751.png)
+![image-20231107214357751](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231107214357751.png)
 
 MenuOS上如下：
 
-![image-20231107214407872](/home/elon/.config/Typora/typora-user-images/image-20231107214407872.png)
+![image-20231107214407872](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231107214407872.png)
 
 本次调试过程基本符合之前分析的步骤。
