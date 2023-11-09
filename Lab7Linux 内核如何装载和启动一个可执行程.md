@@ -141,13 +141,30 @@ execve函数信息如下：
 #include <unistd.h>
 
 int main() {
-    execl("./hello", "./hello", (char *)0);
-
-    // 如果 execl 函数调用失败，才会执行下面的代码
-    perror("execl"); // 打印错误信息
-    return 1;
+	int pid;
+	/* fork another process */
+	pid = fork();
+	if (pid < 0) 
+	{ 
+		/* error occurred */
+		fprintf(stderr,"Fork Failed!");
+		exit(-1);
+	} 
+	else if (pid == 0) 
+	{
+		/*	 child process 	*/
+    	printf("This is Child Process!\n");
+		execlp("/hello","hello",NULL);
+	} 
+	else 
+	{ 	
+		/* 	parent process	 */
+    	printf("This is Parent Process!\n");
+		/* parent will wait for the child to complete*/
+		wait(NULL);
+		printf("Child Complete!\n");
+	}
 }
-
 ```
 
 在 `execl` 函数中，第一个参数是可执行文件的路径，第二个参数是程序的名称，最后一个参数必须是 `(char *)0`。
@@ -160,7 +177,7 @@ gcc -o local_exec local_exec.c
 
 运行结果如下：
 
-![image-20231108211535319](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231108211535319.png)
+![image-20231109161948754](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231109161948754.png)
 
 ## 动态链接
 
@@ -180,9 +197,11 @@ gcc hello.o -o hello.dynamic
 
 ![image-20231108210901120](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231108210901120.png)
 
-可执行程序装载时动态链接代码：
+以下是用于实践动态链接的代码：
 
-`shlibexample.h` 源代码：
+首先是可执行程序装载时动态链接代码，我们需要创建两个文件，分别是 `shlibexample.h` 和 `shlibexample.c` 文件。
+
+`shlibexample.h` 源代码如下：
 
 ```c
 #ifndef _SH_LIB_EXAMPLE_H_
@@ -201,7 +220,7 @@ extern "C"{
 #endif
 ```
 
-`shlibexample.c `源代码：
+`shlibexample.c ` 源代码如下：
 
 ```c
 #include <stdio.h>
@@ -213,13 +232,15 @@ int SharedLibApi(){
 }
 ```
 
+保存好后文件后，在`visionfive 2` 开发板使用以下命令，创建 `libshlibexample.so` 文件:
+
 ```c
 gcc -shared shlibexample.c -o libshlibexample.so
 ```
 
-运行时动态链接代码
+实现运行时动态链接，我们也需要创建两个文件，分别是 `dllibexample.h` 和 `dllibexample.c` 文件。
 
-`dllibexample.h` 源代码：
+`dllibexample.h` 源代码如下：
 
 ```c
 #ifndef _DL_LIB_EXAMPLE_H_
@@ -237,9 +258,9 @@ extern "C"{
 #endif
 ```
 
-`dllibexample.c` 源代码：
+`dllibexample.c` 源代码如下：
 
-```
+```c
 #include <stdio.h>
 #include "dllibexample.h"
 
@@ -252,11 +273,13 @@ int DynamicalLoadingLibAPi(){
 }
 ```
 
+同样保存好后文件后，在`visionfive 2` 开发板使用以下命令，创建 `libdlibexample.so` 文件:
+
 ```c
 gcc -shared dllibexample.c -o libdlibexample.so
 ```
 
-动态链接代码：
+当分别生成好 `libshlibexample.so` 文件和 `libdlibexample.so` 文件后，我们需要分别调用这两个文件。在`visionfive 2` 开发板中创建一个名为 `main.c` 的文件，`main.c` 的内容如下：
 
 ```
 #include <stdio.h>
@@ -286,4 +309,108 @@ int main(){
 }
 ```
 
+编辑好保存后，使用以下命令编译成 `main` 可执行文件：
+
+```c
+gcc main.c -o main -L/root/Code/ -lshlibexample -ldl
+```
+
+然后将之前生成的 `shlibexample.so` 文件拷贝到 `/usr/local/lib` 中否则程序无法找到 `shlibexample.so`文件。完成以上工作后，使用以下命令，即可实现可执行程序装载时动态链接和运行时动态链接:
+
+```bash
+./main	
+```
+
+成功运行后，会显示以下信息：
+
 ![image-20231108220153906](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231108220153906.png)
+
+## gdb 跟踪分析一个 execve 系统调用
+
+进入MenuOS目录中的menuos目录后，编辑test.c, 在其中加入以下代码：
+
+首先添加以下的头文件
+
+```c
+#include <unistd.h>
+```
+
+然后添加 `Exec` 函数：
+
+```c
+int Exec(int argc, char *argv[])
+{
+	int pid;
+	/* fork another process */
+	pid = fork();
+	if (pid < 0)
+	{
+		/* error occurred */
+		fprintf(stderr,"Fork Failed!");
+		exit(-1);
+	}
+	else if (pid == 0)
+	{
+		/*	 child process 	*/
+    	printf("This is Child Process!\n");
+		execlp("/hello","hello",NULL);
+	}
+	else
+	{
+		/* 	parent process	 */
+    	printf("This is Parent Process!\n");
+		/* parent will wait for the child to complete*/
+		wait(NULL);
+		printf("Child Complete!\n");
+	}
+}
+```
+
+最后在 `main` 函数中添加以下语句：
+
+```c
+MenuConfig("execve", "execve new process", Exec);
+```
+
+在menuos目录下使用以下语句进行编译：
+
+```c
+make
+make rootfs
+```
+
+编译完成后，在两个终端上分别启动 `init-gdb.sh` 和 `start-gdb.sh` 脚本。脚本启动后，在启动 `start-gdb.sh` 的终端上输入 `target remote:1234` 连接qemu中的gdbserver。完成后，使用下述命令在gdb中为 `sys_execve` 设置断点：
+
+```gdb
+b sys_execve
+```
+
+打好断点后，使用 `c` 命令，加载MenuOS后输入 `exec` 开始调试 `exec`，如下图所示：
+
+![image-20231109163507762](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231109163507762.png)
+
+首先跳转到 `SYSCALL_DEFINE3(execve, ....) `：
+
+![image-20231109164518819](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231109164518819.png)
+
+函数体中有 `do_execve() `  ，然后使用 `b do_execve`  命令进行打断点：
+
+![image-20231109165602046](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231109165602046.png)
+
+进入 `do_execve() ` 后调用 `do_execveat_common` 函数, 现在给`do_execveat_common` 函数打上断点：
+
+![image-20231109165917824](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231109165917824.png)
+
+而大部分的工作基本上都是在 `do_execveat_common` 函数内完成的，`do_execveat_common` 函数执行完后会依次返回到 `SYSCALL_DEFINE3(execve, ....) ` 中完成调用, 完成调用后 MenuOS中的Shell将显示 `hello world!`:
+
+![image-20231109165138037](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231109165138037.png)
+
+但此时，进程仍然没有结束，下一步将进入 `schedule` 函数中依次执行 `schedule` 函数中的内容:
+
+![image-20231109164729388](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231109164729388.png)
+
+ `schedule` 函数结束后，将再次引发 `Shell` 程序引起的中断：
+
+![image-20231109170505625](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231109170505625.png)
+
+此时MenuOS中的Shell可以再次输入命令。
