@@ -2,7 +2,7 @@
 
 Linux内核是一个开源、免费的操作系统内核，它是整个Linux操作系统的核心部分。但是由于Linux内核过于复杂，不易深入学习。由人民邮电出版社和中国工信出版社集团联合出版的《庖丁解牛Linux操作系统分析》一书，是我的恩师娄嘉鹏老师和孟宁老师共同编写的书籍并作为中科大软工学院和电科院研究生部的教材。自出版以来已获奖无数，该书内容翔实，通俗易懂，如今已在操作系统类图书排行上排名第六。
 
-<img src="https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/mmexport1699537571114-removebg-preview.png" alt="《庖丁解牛Linux操作系统分析》" style="zoom: 50%;" />
+<img src="https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/linuxbook.png" alt="linuxbook" style="zoom:25%;" />
 
 本文集记录了该书中的八个实验，但与教材不同的是，本文记录的八个实验均是在RISC-V架构上的机器上实现的。RISC-V（发音为"risk-five"）是一种基于精简指令集计算机（RISC）原则的开放架构，被视为将来最有潜力与X86架构和Arm架构相竞争的新指令集架构。在本文集中所记录的实验中，除了需要使用GDB调试的部分使用了qemu进行模拟RISC-V架构的裸机之外，均使用了来自赛昉科技研发的全球首发的新一代RISC-V架构的开发板——Visionfive 2 实现的。
 
