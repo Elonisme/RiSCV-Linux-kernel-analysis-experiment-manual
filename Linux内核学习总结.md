@@ -1,8 +1,8 @@
-# Linux 内核学习总结
+# Linux内核学习总结
 
 Linux内核是一个开源、免费的操作系统内核，它是整个Linux操作系统的核心部分。但是由于Linux内核过于复杂，不易深入学习。由人民邮电出版社和中国工信出版社集团联合出版的《庖丁解牛Linux操作系统分析》一书，是我的恩师娄嘉鹏老师和孟宁老师共同编写的书籍并作为中科大软工学院和电科院研究生部的教材。自出版以来已获奖无数，该书内容翔实，通俗易懂，如今已在操作系统类图书排行上排名第六。
 
-<img src="https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/mmexport1699537571114-removebg-preview.png" alt="《庖丁解牛Linux操作系统分析》" style="zoom: 50%;" />
+<img src="https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/linuxbook.png" alt="linuxbook" style="zoom:25%;" />
 
 本文集记录了该书中的八个实验，但与教材不同的是，本文记录的八个实验均是在RISC-V架构上的机器上实现的。RISC-V（发音为"risk-five"）是一种基于精简指令集计算机（RISC）原则的开放架构，被视为将来最有潜力与X86架构和Arm架构相竞争的新指令集架构。在本文集中所记录的实验中，除了需要使用GDB调试的部分使用了qemu进行模拟RISC-V架构的裸机之外，均使用了来自赛昉科技研发的全球首发的新一代RISC-V架构的开发板——Visionfive 2 实现的。
 
@@ -20,4 +20,8 @@ Linux内核是一个开源、免费的操作系统内核，它是整个Linux操�
 6. [分析 Linux 内核创建一个新进程的过程](https://github.com/Elonisme/RiSCV-Linux/blob/master/Lab6%E5%88%86%E6%9E%90%20Linux%20%E5%86%85%E6%A0%B8%E5%88%9B%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%96%B0%E8%BF%9B%E7%A8%8B%E7%9A%84%E8%BF%87%E7%A8%8B.md)
 7. [Linux 内核如何装载和启动一个可执行程](https://github.com/Elonisme/RiSCV-Linux/blob/master/Lab7Linux%20%E5%86%85%E6%A0%B8%E5%A6%82%E4%BD%95%E8%A3%85%E8%BD%BD%E5%92%8C%E5%90%AF%E5%8A%A8%E4%B8%80%E4%B8%AA%E5%8F%AF%E6%89%A7%E8%A1%8C%E7%A8%8B.md)
 8. [理解进程调度时机跟踪分析进程调度与进程切换的过程](https://github.com/Elonisme/RiSCV-Linux/blob/master/Lab8%E7%90%86%E8%A7%A3%E8%BF%9B%E7%A8%8B%E8%B0%83%E5%BA%A6%E6%97%B6%E6%9C%BA%E8%B7%9F%E8%B8%AA%E5%88%86%E6%9E%90%E8%BF%9B%E7%A8%8B%E8%B0%83%E5%BA%A6%E4%B8%8E%E8%BF%9B%E7%A8%8B%E5%88%87%E6%8D%A2%E7%9A%84%E8%BF%87%E7%A8%8B.md)
+
+
+
+
 
