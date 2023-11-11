@@ -1,14 +1,14 @@
-# RiSCV-Linux内核分析序言
+# RiSCV-Linux内核分析实验手册序言
 
 Linux内核是一个开源、免费的操作系统内核，它是整个Linux操作系统的核心部分。但是由于Linux内核过于复杂，不易深入学习。由人民邮电出版社和中国工信出版社集团联合出版的《庖丁解牛Linux操作系统分析》一书，是我的恩师娄嘉鹏老师和孟宁老师共同编写的书籍并作为中科大软工学院和电科院研究生部的教材。自出版以来已获奖无数，该书内容翔实，通俗易懂，如今已在操作系统类图书排行上排名第六。
 
 <img src="https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/linuxbook.png" alt="linuxbook" style="zoom:25%;" />
 
-本文集记录了该书中的八个实验，但与教材不同的是，本文记录的八个实验均是在RISC-V架构上的机器上实现的。RISC-V（发音为"risk-five"）是一种基于精简指令集计算机（RISC）原则的开放架构，被视为将来最有潜力与X86架构和Arm架构相竞争的新指令集架构。在本文集中所记录的实验中，除了需要使用GDB调试的部分使用了qemu进行模拟RISC-V架构的裸机之外，均使用了来自赛昉科技研发的全球首发的新一代RISC-V架构的开发板——Visionfive 2 实现的。
+本手册记录了该书中的八个实验，但与教材不同的是，本手册记录的八个实验均是在RISC-V架构上的机器上实现的。RISC-V（发音为"risk-five"）是一种基于精简指令集计算机（RISC）原则的开放架构，被视为将来最有潜力与X86架构和Arm架构相竞争的新指令集架构。在本手册中所记录的实验中，除了需要使用GDB调试的部分使用了qemu进行模拟RISC-V架构的裸机之外，均使用了来自赛昉科技研发的全球首发的新一代RISC-V架构的开发板——Visionfive 2 实现的。
 
-本文集从内容上来说，记录了比较详细的过程，使得读者能够尽可能容易的复现出所有实验。通过阅读和复现本文集的各个实验，你除了将学习到《庖丁解牛Linux操作系统分析》中记录的关于Linux 内核的知识点，还能学习到如何给RISC-V架构的开发板烧录GNU/LInux操作系统的发行版Debain操作系统；如何使用ssh和串口通讯连接RISC-V架构的开发板；OpenSBI和Uboot是何物; 一个简易的Linux操作系统将如何制作；如何使用TFTP协议给只带有Uboot的开发板传输文件；如何在Uboot上引导Linux内核和根文件系统；如何在X86平台上交叉编译RISC-V Linux内核；如何制作根文件系统；MenuOS如何在RISC-V架构上实现；RISC Linux内核是如何运行的等等。
+本手册从内容上来说，记录了比较详细的过程，使得读者能够尽可能容易的复现出所有实验。通过阅读和复现本手册的各个实验，你除了将学习到《庖丁解牛Linux操作系统分析》中记录的关于Linux 内核的知识点，还能学习到如何给RISC-V架构的开发板烧录GNU/LInux操作系统的发行版Debain操作系统；如何使用ssh和串口通讯连接RISC-V架构的开发板；OpenSBI和Uboot是何物; 一个简易的Linux操作系统将如何制作；如何使用TFTP协议给只带有Uboot的开发板传输文件；如何在Uboot上引导Linux内核和根文件系统；如何在X86平台上交叉编译RISC-V Linux内核；如何制作根文件系统；MenuOS如何在RISC-V架构上实现；RISC Linux内核是如何运行的等等。
 
-本文集由我和[ZyLqb](https://github.com/ZyLqb)共同完成，由于我们两个现在还都是学生，因此本文集中难免会出现各种错误，请各位读者批评指正，欢迎提交Pr。
+本手册由我和[ZyLqb](https://github.com/ZyLqb)共同完成，由于我们两个现在还都是学生，因此本手册中难免会出现各种错误，请各位读者批评指正，欢迎提交Pr。祝你学习快乐！！！
 
 ## 目录:
 
@@ -23,5 +23,9 @@ Linux内核是一个开源、免费的操作系统内核，它是整个Linux操�
 
 
 
+## 实验相关平台
 
+- [riscv-menu](https://github.com/Elonisme/riscv-menu)
+
+- [riscv-mykernel](https://github.com/Elonisme/riscv-mykernel#riscv-mykernel) 
 
