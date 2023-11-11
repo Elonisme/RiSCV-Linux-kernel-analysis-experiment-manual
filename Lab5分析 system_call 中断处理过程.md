@@ -209,7 +209,19 @@ layout split
 
 ![image-20231106162854338](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231106162854338.png)
 
-开始调试 `WriteAsm` 函数，使用 `si` 命令后，程序停留在 `SYSCALL_DEFINE3` 的函数中的返回语句 `return ksys_write(fd, buf, count); ` ，如下图所示：
+此时可以开始分析 `Cwrite` 中使用系统调用 `write` 的过程。首先使用以下命令对 `handle_exception` 打断点：
+
+```c
+b handle_exception
+```
+
+然后使用命令 `c` 进入到 `handle_exception` 断点处。在 `handle_exception` 函数中，根据异常号判断是否是系统调用。如果是系统调用，控制权会传递到系统调用处理的分发函数。
+
+![image-20231111184909752](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231111184909752.png)
+
+`generic_handle_arch_irq` 是 Linux 内核中的一个通用中断处理函数，它用于处理系统中断的基本工作。这个函数的主要作用是将控制权传递给适当的中断处理函数。在 Linux 内核中，每个中断都有一个对应的中断处理函数，用于处理特定类型的中断。`generic_handle_arch_irq` 通过查询中断描述符表（Interrupt Descriptor Table，IDT）来确定要执行的中断处理函数，并将控制权转交给它。
+
+使用命令 `c` 进入  `ksys_write` 断点处。在 `SYSCALL_DEFINE3` 的函数中的返回语句 `return ksys_write(fd, buf, count); ` ，如下图所示：
 
 ![image-20231106162942747](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231106162942747.png)
 
@@ -217,16 +229,15 @@ layout split
 
 ![image-20231106163210213](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231106163210213.png)
 
-基本上调用过程如下：
+`system_call` 调用过程如下：
 
 ```mermaid
 graph TD;
-   SYSCALL_DEFINE3-->ksys_write;
-   ksys_write--> ret;
-   ret-->SYSCALL_DEFINE3;
+   ecall指令触发中断-->handle_exception处理中断;
+   handle_exception处理中断--> handle_syscall处理系统调用;
+   handle_syscall处理系统调用-->系统调用sys_write;
+   系统调用sys_write--> ret_from_exception中断返回:
 ```
 
-程序先执行到 ` SYSCALL_DEFINE3` 函数， 然后调用唯一的返回语句中的 `ksys_write` 函数， 之后执行 `ksys_write` 函数的内容，最后返回到 `SYSCALL_DEFINE3` 函数
 
-## system_call 中断分析（王瑞）
 
