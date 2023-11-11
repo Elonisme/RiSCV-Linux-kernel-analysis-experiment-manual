@@ -629,8 +629,8 @@ diff --color -Naru Linux/mykernel/mypcb.h linux/mykernel/mypcb.h
 
 todo稍微解释一下汇编代码和C代码以及原理：
 
-```
-
+```bash
+patch -p1 < ../kernel.patch
 ```
 
 

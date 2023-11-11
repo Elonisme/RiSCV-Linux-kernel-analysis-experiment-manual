@@ -361,6 +361,18 @@ gdb显示`start_kernel`函数在init/main.c文件中。
 
 `l`命令显示`start_kernel`函数位于`init/main.c`中的930行。
 
+在Linux 内核的进程树中，涉及到三个重要的进程，分别是 `0号进程` 和 `1号进程` 以及 `2号进程` 。示意图如下所示：
+
+```mermaid
+graph TD
+0 --> 1;
+0 --> 2;
+1 --> 用户进程;
+2 --> 内核线程;
+```
+
+ `0号进程` 是通过手动创建的，在 `start_kernel` 中出现的 `&init_task` 就是 `0号进程` 的进程描述符。
+
 接下来，让我们先使用编辑器打开linux-5.19.16中init目录中的main.c文件找到`asmlinkage __visible void __init __no_sanitize_address start_kernel(void)`。让我们一起阅读`start_kernel`函数的Linux内核源码。
 
 在这部分的源码中的1138行，也就是`start_kernel`函数的倒数第二个函数，有一个名叫 `arch_call_rest_init()` 的函数。 `arch_call_rest_init()` 的定义如下：
@@ -372,11 +384,17 @@ void __init __weak arch_call_rest_init(void)
 }
 ```
 
-我们在gdb中不断使用`n`命令，当next到了 `arch_call_rest_init` 时Linux Kernel引导即将完毕，gdb server端即将进入了根文件系统。
+我们在gdb中不断使用`n`命令，当next到了 `arch_call_rest_init` 时， 内核即将创建 `kernel_init` 1号进程和 `kthreadd` 2号进程。
 
 ![image-20231105113449231](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231105113449231.png)
 
-此时再使用`n`命令，将完成Linux Kernel引导，系统进入登录界面：
+使用 `b rest_init` 对 rest_init()函数进行打断点，进入 rest_init 函数后如下：
+
+![image-20231111155131309](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231111155131309.png)
+
+此时执行下一步会出现调用 `user_mode_thread `， 此时这个函数就是创建 `1号进程`，而 `1号进程` 也被称为 `init` 进程 。继续向下单步执行, 会发现调用 `kernel_thread` ，这个函数就是用于创建 `2号进程`  ，即内核线程。
+
+此时再使用`c`命令，将完成Linux Kernel引导，系统进入登录界面：
 
 ![image-20231105113622844](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231105113622844.png)
 
