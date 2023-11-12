@@ -141,9 +141,155 @@ cd opensbi && git checkout master && cd ..
 cd soft_3rdpart && git checkout JH7110_VisionFive2_devel && cd ..
 ```
 
-## RISC-V架构MyKernel内核的构建Todo
+## RISC-V架构MyKernel内核的构建
 
-myinterrupt.c
+#### 实验目的和实验内容
+这次实验主要目的是初识RISC—V架构。简单的了解一下RISC-V下的汇编，理解代码在RISC-V下是怎么跑起来的。  
+我们将会实现一个非常简单的进程调度器，来帮助我们理解操作系统和RISC-V。
+
+#### 了解riscv
+如果需要更加详细的了解请参考：
+ - [RISC-V中文参考](http://riscvbook.com/chinese/RISC-V-Reader-Chinese-v2p1.pdf)。  
+ - The RISC-V Instruction Set Manual([Volume I](https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf) , [Volume II](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf)) 
+ - [ABI for RISC-V](https://github.com/riscv-non-isa/riscv-elf-psabi-doc)  
+   
+我们这里只是简单的了解一下riscv寄存器的 RISC-V 应用程序二进制接口（ABI）  
+![寄存器](image.png)  
+这些寄存器是riscv的通用寄存器，一共有32个，在这一章我们可能会用到`ra寄存器`：保存函数返回地址。`sp寄存器`：保存函数的栈指针。
+#### 函数是怎么执行的
+我们都知道，c语言会被转化成汇编在转化成机器码。而汇编和机器码之间的转换是直接转换的。所以我们理解了一个函数在汇编上怎么运行的，那么我们就能理解函数在计算机上是如何运行的。  
+>我们这里使用的是RISC-V的指令架构，所以我们只讲解RISC-V下的汇编代码。但是为了更好的理解，我强烈建议先阅读理解x86下函数是怎么运行的。
+> - [C语言函数调用栈(一)](https://www.cnblogs.com/clover-toeic/p/3755401.html)
+> - [C语言函数调用栈(二)](https://www.cnblogs.com/clover-toeic/p/3756668.html)
+
+首先我们来看在初入计算机世界的时候，我们遇到的第一份代码hello world的反汇编代码。
+```c
+#include <stdiio.h>
+int main(){
+	printf("hello world");
+}
+``` 
+我们编译好之后用objdump反汇编一下，我这里去除掉了一些不需要的信息,只保留main函数的部分。
+```shell
+hello:     file format elf64-littleriscv
+
+Disassembly of section .text:
+
+000000000000062a <main>:
+ 62a:   1141                    addi    sp,sp,-16
+ 62c:   e406                    sd      ra,8(sp)
+ 62e:   e022                    sd      s0,0(sp)
+ 630:   0800                    addi    s0,sp,16
+ 632:   00000517                auipc   a0,0x0
+ 636:   07650513                addi    a0,a0,118 # 6a8 <__libc_csu_fini+0x6>
+ 63a:   f17ff0ef                jal     ra,550 <printf@plt>
+ 63e:   4781                    li      a5,0
+ 640:   853e                    mv      a0,a5
+ 642:   60a2                    ld      ra,8(sp)
+ 644:   6402                    ld      s0,0(sp)
+ 646:   0141                    addi    sp,sp,16
+ 648:   8082                    ret
+```
+我们来分析一下这段代码：  
+
+首先`addi sp,sp,-16`的作用是开栈（这里假定对函数栈有一定的了解，如果不了解请阅读上文的c语言函数调用栈
+），为函数开辟自己的栈帧。  
+
+然后是`sd ra,8(sp)`和`sd s0,0(sp)` 这是将ra和s0分别存储在sp+8和sp+0的位置。这个里这个ra是函数的返回地址（调用者调用此函数的下一条指令）当函数执行完后，此函数的调用者时就是跳转到ra中存储的位置，如果此函数时最末端的叶子调用，是不用将其存入栈里面的。s0是函数的栈的栈底，也就是帧指针。  
+接下来是函数内部的一些计算跳转，我们先不管。  
+
+直接看到下面的642位置 `ld ra,8(sp)`和644`ld s0.0(sp)` 这两个指令是把函数在开始存储的返回地址和帧指针重新加载进相应的寄存器
+
+然后是`addi sp,sp,-16`收回栈帧。
+最后ret，这个ret是个伪指令，实际上是`jar ra`  
+
+那么我们就可以大概了解函数是怎么运行的了：  
+1.首先为函数开辟栈帧  
+2.接着存储返回地址和上个栈帧的基址  
+3.运算  
+4.将存储的返回地址和帧地址重新加载进相应的寄存器  
+5.收回栈帧  
+6.返回上个函数调用此函数的位置的下一条指令。
+#### 我们的简易调度器
+有了以上信息后，理论上我们已经可以手写汇编了，那么我们来完成一下我们的内容：编写一个简单的调度器。  
+首先制定我们的需求：
+- 可以进行进程切换
+- 简单  
+
+那么一个进程里面会有什么呢--pc寄存器加上通用寄存器，加上函数的栈帧。我们一般称之为函数现场。当现场没变，那么程序的状态就没变。也就是说当我们保存了现场，然后切换到其他进程运行一段时间后，恢复它那么我们就能切换回来，继续运行。那么我们就可以定义一个时间片段，允许每个进程运行一段时间然后切换到其他进程。这样我们就能做到根据时间片的多个进程的轮转调度了。
+
+但是riscv的通用寄存器有32个，很多，我们其实是不需要全部保存的，只需要保存caller save的寄存器。但是对此时的我们来说还是有点多，我们可以再精简一点，省去我们不需要的寄存器，比如有关浮点数的寄存器我们这里是用不到的。
+
+#### coding
+##### PCB
+首先我们得有一个存储现场的地方，我们将现场存储在pcb的AThread里面，每次切换出去的时候把它保存进来，切换回来的时候，从这里把寄存器重新加载进去。
+
+注意这里的__switch函数，在这里我们写了两部分的汇编代码。第一部分就是是将当前的各种寄存器存入内存，第二部分就是将内存中存储的值加载进寄存器。但是函数入口会改变栈，所以在存储之前我们先要将函数入口给回退。
+
+这部分的代码逻辑就很清晰了，定时器中断里面的值达到我们期望的值的时候进行一次进程切换。  
+mypcb.h
+
+```c
+/*
+ *  linux/mykernel/mypcb.h
+ *
+ *  Kernel internal PCB types
+ *
+ *  Copyright (C) 2023  WangRui
+ *
+ */
+
+#define MAX_TASK_NUM        4
+#define KERNEL_STACK_SIZE   1024*2
+/* CPU-specific state of this task */
+//初始状态
+typedef struct Thread {
+    unsigned long       s0;
+    unsigned long		ip;
+    unsigned long		sp;
+}tThread;
+//保存的现场
+typedef struct AThread {
+    //unsigned long       s0;
+    unsigned long		ra;
+    unsigned long		sp;
+    unsigned long		s0;
+    unsigned long		s1;
+    unsigned long		s2;
+    unsigned long		s3;
+    unsigned long		s4;
+    unsigned long		s5;
+    unsigned long		s6;
+    unsigned long		s7;
+    unsigned long		s8;
+    unsigned long		s9;
+    unsigned long		s10;
+    unsigned long		s11;
+}aThread;
+
+typedef struct PCB{
+    int pid;
+    volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
+	unsigned long stack[KERNEL_STACK_SIZE];//在这里存储进程的整个栈。
+    /* CPU-specific state of this task */
+    struct Thread thread;
+    unsigned long	task_entry;
+    struct PCB *next;	
+}tPCB;
+
+void my_schedule(void);
+
+```
+这部分代码主要是一些数据结构的定义，我们把一个进程的状态抽象成一个pcb块，在这里我们存入最主要的几个数据：  
+ - pid：进程的进程号，是一个标识符，它是唯一的。
+ - state： 用来表示进程当前的状态。如果是runnaable的话就可以被进程调度器发现，并且参与调度。
+ - stack： 程序运行时所使用的栈空间，每个程序的栈空间时不一样的。
+ - thread：用来保存程序运行时的寄存器状态，即现场。
+ - tash_entry: 用来表示程序的入口地址，简单理解相当于我们平时编程的main函数。
+ - next： 表示下一个程序的地址。  
+  
+
+##### my_schdule
 
 ```c
 /*
@@ -172,6 +318,8 @@ volatile int time_count = 0;
  * it runs in the name of current running process,
  * so it use kernel stack of current running process
  */
+//我们的定时器
+
 void my_timer_handler(void)
 {
     if(time_count%1000 == 0 && my_need_sched != 1)
@@ -183,6 +331,48 @@ void my_timer_handler(void)
     return;  	
 }
 
+void __switch(aThread * old,aThread *new){
+    //old a0 new a1
+    asm volatile (
+        "add s0,sp,-16\n"
+        "ld s0,8(sp)\n"
+        "add sp,sp,16\n"
+        "sd ra,0(%[old]) \n"
+        "sd sp,8(%[old]) \n"
+        "sd s0,16(%[old]) \n"
+        "sd s1,24(%[old]) \n"
+        "sd s2,32(%[old]) \n"
+        "sd s3,40(%[old]) \n"
+        "sd s4,48(%[old]) \n"
+        "sd s5,56(%[old]) \n"
+        "sd s6,64(%[old]) \n"
+        "sd s7,72(%[old]) \n"
+        "sd s8,80(%[old]) \n"
+        "sd s9,88(%[old]) \n"
+        "sd s10,96(%[old]) \n"
+        "sd s11,104(%[old]) \n"
+        
+
+        "ld ra, 0(%[new]) \n"
+        "ld sp, 8(%[new]) \n"
+        "ld s0, 16(%[new]) \n"
+        "ld s1, 24(%[new]) \n"
+        "ld s2, 32(%[new]) \n"
+        "ld s3, 40(%[new]) \n"
+        "ld s4, 48(%[new]) \n"
+        "ld s5, 56(%[new]) \n"
+        "ld s6, 64(%[new]) \n"
+        "ld s7, 72(%[new]) \n"
+        "ld s8, 80(%[new]) \n"
+        "ld s9, 88(%[new]) \n"
+        "ld s10, 96(%[new]) \n"
+        "ld s11, 104(%[new]) \n"
+        "ret \n"
+        : 
+        : [old] "r" (old),[new] "r" (new)
+    );
+}
+//调度器
 void my_schedule(void)
 {
     tPCB * next;
@@ -201,24 +391,17 @@ void my_schedule(void)
     {        
     	my_current_task = next; 
     	printk(KERN_NOTICE ">>>switch %d to %d<<<\n",prev->pid,next->pid);  
-    	/* switch to next process */
-    	    	__asm__ volatile(	
-            "mv %0,sp \n"
-            "mv %1,ra \n"
-            "ld sp,%2 \n"
-            "ld ra,%3 \n"
-            "ret"
-        	: "=r" (prev->thread.sp),"=r" (prev->thread.ra)
-        	: "m" (next->thread.sp), "m" ( next->thread.ra)
-    	); 
+		/* switch to next process */
+    	__switch(prev->thread,next->thread)
     }  
     return;	
 }
 ```
 
-todo解释一下汇编代码和C代码以及原理：（进程调度在纸上画个草图，我用LaTex和别的工具画最终的图）
+这里的`my_time_handler`函数时一个定时器中断所调用的函数，每当计算机产生一次定时器中断，就会调用这个函数。这个函数的作用是当触发了一定的定时器中断之后，就开启调度器。有了这个我们就能让我们的程序按时间片进行轮转运行了。  
+而这里的`my_schdule`就是我们的调度器，他最主要的是`__switch`函数这个函数会将此时运行的程序的寄存器保存进prev结构体里面，然后将下一个进程的寄存器状态从next结构体里面取出来，并且加载进寄存器。
 
-mymain.c
+##### 初始化
 
 ```c
 /*
@@ -252,15 +435,25 @@ void __init my_start_kernel(void)
     /* Initialize process 0*/
     task[pid].pid = pid;
     task[pid].state = 0;/* -1 unrunnable, 0 runnable, >0 stopped */
-    task[pid].task_entry = task[pid].thread.ra = (unsigned long)my_process;
+    task[pid].task_entry = task[pid].thread.ip = (unsigned long)my_process;
     task[pid].thread.sp = (unsigned long)&task[pid].stack[KERNEL_STACK_SIZE-1];
-    task[pid].next = &task[pid];
+    task[pid].thread.s0 = (unsigned long)&task[pid].stack[KERNEL_STACK_SIZE-1];
+    task[pid].next = &task[pid];   
+
+    task[pid].context.ra = (unsigned long)my_process;
+    task[pid].context.s0 = (unsigned long)&task[pid].stack[KERNEL_STACK_SIZE-1];
+    task[pid].context.sp = (unsigned long)&task[pid].stack[KERNEL_STACK_SIZE-1];
+    
     /*fork more process */
     for(i=1;i<MAX_TASK_NUM;i++)
     {
         memcpy(&task[i],&task[0],sizeof(tPCB));
         task[i].pid = i;
 	    task[i].thread.sp = (unsigned long)(&task[i].stack[KERNEL_STACK_SIZE-1]);
+        
+        task[i].context.s0 = (unsigned long)&task[i].stack[KERNEL_STACK_SIZE-1];
+        task[i].context.sp = (unsigned long)&task[i].stack[KERNEL_STACK_SIZE-1];
+        
         task[i].next = task[i-1].next;
         task[i-1].next = &task[i];
     }
@@ -296,42 +489,7 @@ void my_process(void)
     }
 }
 ```
-
-(todo)解释一下汇编代码和C代码以及原理：
-
-mypcb.h
-
-```c
-/*
- *  linux/mykernel/mypcb.h
- *
- *  Kernel internal PCB types
- *
- *  Copyright (C) 2023  WangRui
- *
- */
-
-#define MAX_TASK_NUM        4
-#define KERNEL_STACK_SIZE   1024*2
-/* CPU-specific state of this task */
-struct Thread {
-    unsigned long		ra;
-    unsigned long		sp;
-};
-
-typedef struct PCB{
-    int pid;
-    volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
-    unsigned long stack[KERNEL_STACK_SIZE];
-    /* CPU-specific state of this task */
-    struct Thread thread;
-    unsigned long	task_entry;
-    struct PCB *next;
-}tPCB;
-
-void my_schedule(void);
-
-```
+这里的`my_kernel_start`函数主要是进行一些初始化，其实主要就是初始化进程运行的栈空间，和entry的地址，这里的汇编代码的作用是将第一个程序的entry地址填入ra之中，而我们都知道ra是保存的是函数返回之后，下一条指令运行的地址，所以我们在这里将entry直接加载进ra然后跳转到这个地址，这样我们就能改变函数的运行顺序，从而进入我们自己写的程序里面。  
 
 Makefile:
 
