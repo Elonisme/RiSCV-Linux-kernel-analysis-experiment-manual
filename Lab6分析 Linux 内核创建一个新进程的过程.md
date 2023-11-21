@@ -278,6 +278,7 @@ int ForkProcess(int argc, char *argv[]){
     wait(NULL);
     printf("Child Complete!\n");
   }
+}
 ```
 
 并在main函数中添加以下语句：

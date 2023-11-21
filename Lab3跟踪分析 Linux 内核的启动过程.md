@@ -76,7 +76,7 @@ make install
 
 ## 编译OpenSBI
 
-SBI是RISC-V架构下的特权层二进制接口，是用于引导程序环境的规范。通俗的讲就是x86下的bios,但这并不准确。OpenSBI的英文全称是[RISC-V Open Source Supervisor Binary Interface ](https://github.com/riscv-software-src/opensbi#risc-v-open-source-supervisor-binary-interface-opensbi)。我们使用OpenSBI引导linux内核的加载。
+SBI是RISC-V架构下的特权层二进制接口，是用于引导程序环境的规范。通俗的讲就是x86下的bios,但这并不准确，如果想要详细了解什么是OpenSBI，可以参考这个链接[OpenSBI Deep Dive](https://riscv.org/wp-content/uploads/2019/06/13.30-RISCV_OpenSBI_Deep_Dive_v5.pdf)。OpenSBI的英文全称是[RISC-V Open Source Supervisor Binary Interface ](https://github.com/riscv-software-src/opensbi#risc-v-open-source-supervisor-binary-interface-opensbi)。我们使用OpenSBI引导linux内核的加载。
 
 使用以下的命令在riscv64_oslab目录下克隆OpenSBI：
 
@@ -117,7 +117,7 @@ sequenceDiagram
 
 ## 编译Linux Kernel
 
-由于Linux Kernel在6.0的版本后使用了rust语言进行了编写，为了减少不必要的麻烦和意外，我们使用的Linux内核。
+由于Linux Kernel在6.0的版本后使用了rust语言进行了编写，为了减少不必要的麻烦和意外，我们使用的Linux内核版本小于v6.0。
 
 使用以下命令在riscv64_oslab目录下下载和解压Kernel:
 
@@ -138,7 +138,7 @@ export CROSS_COMPILE=riscv64-linux-
 make defconfig
 ```
 
-使用`make defconfig`后Linux内核目录下会产生一个.config文件，为了方便后面的使用GDB调试RISC-V版本的Linux内核，我们需要修改Linux内核目录下的Makefile文件，这里依旧使用emacs进行修改，读者请使用自己喜好的编辑器修改。
+使用`make defconfig`后Linux内核目录下会产生一个.config文件，为了方便后面的使用GDB调试RISC-V版本的Linux内核，我们需要为我们编译的内核附加上调试信息。我们需要修改Linux内核目录下的Makefile文件，这里依旧使用emacs进行修改，读者请使用自己喜好的编辑器修改。
 
 ```bash
 emacs Makefile
@@ -166,7 +166,7 @@ make -j$(nproc)
 
 ## 制作根文件系统
 
-一般一个简易的Linux操作系统包括两个部分，一个是Linux Kernel，另一个是根文件系统。制作根文件系统通常有两个工具可以使用，一种是BusyBox，另一种是Buildroot。使用BusyBox制作根文件系统的步骤较多,.使用灵活，而Buildroot操作简单。
+一般一个简易的Linux操作系统包括两个部分，一个是Linux Kernel，另一个是根文件系统。制作根文件系统通常有两个工具可以使用，一种是BusyBox，另一种是Buildroot。使用BusyBox制作根文件系统的步骤较多,但是很灵活。而Buildroot操作简单。
 
 首先在riscv64_oslab目录下下载和解压buildroot：
 

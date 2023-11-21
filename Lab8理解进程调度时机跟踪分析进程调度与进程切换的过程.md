@@ -46,7 +46,7 @@
 
 ![image-20231109204506752](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/image-20231109204506752.png)
 
-## 分析 switch_to 中的汇编代码(王瑞 todo)
+## 分析 switch_to 中的汇编代码
 
 在RISC-V架构的Linux内核中，switch_to的汇编代码位于 `arch/riscv/kernel/entry.S` 中。
 
@@ -92,6 +92,121 @@ ENTRY(__switch_to)
 	ret
 ENDPROC(__switch_to)
 ```
+
+## 分析汇编代码
+看到这段汇编代码，我们首先要做的是预处理一下，首先理解这个REG...和TASH...这些宏是什么。这里可以通过全局搜索，找到他们的定义。经过全局搜索发现，他们被定义在`arch/riscv/include/asm/include.h`里面。  
+```c
+#ifndef _ASM_RISCV_ASM_H
+#define _ASM_RISCV_ASM_H
+
+#ifdef __ASSEMBLY__
+#define __ASM_STR(x)	x
+#else
+#define __ASM_STR(x)	#x
+#endif
+
+#if __riscv_xlen == 64
+#define __REG_SEL(a, b)	__ASM_STR(a)
+#elif __riscv_xlen == 32
+#define __REG_SEL(a, b)	__ASM_STR(b)
+#else
+#error "Unexpected __riscv_xlen"
+#endif
+
+#define REG_L		__REG_SEL(ld, lw)
+#define REG_S		__REG_SEL(sd, sw)
+
+``` 
+在riscv中一个字是32位，64字是double world。在汇编代码中一般用w（32位）表示一个字，用d（64位）表示2个字。在c语言的宏里面#的作用是将传入的字符变成一个用双引号包裹的字符串（请自行查看相关标准）。我们这里不需要双引号，并且是64位，所以REG_L预处理之后应该是`ld`和`sd`
+
+在arch/riscv/kernel/asm-offsets.c中我们可以找到TASK_THREAD_RA_RA的定义  
+```c
+void asm_offsets(void)
+{
+	OFFSET(TASK_THREAD_RA, task_struct, thread.ra);
+	...
+	DEFINE(TASK_THREAD_RA_RA,
+		  offsetof(struct task_struct, thread.ra)
+		- offsetof(struct task_struct, thread.ra)
+	);
+}
+```
+这个TASK_THREAD_RA_RA的意思就是得到ra寄存器距离ra寄存器的offset。这里是用task_struct里面的thread.ra的地址减去thrad.ra的地址。而TASH_THREAD_RA就是thread.ra距离task_struct的偏移地址。  
+接下来我们来看看这个thread的数据结构,它在`/arch/riscv/include/asm/processor.h`里面。
+
+```c
+struct thread_struct {
+	/* Callee-saved registers */
+	unsigned long ra;
+	unsigned long sp;	/* Kernel mode stack */
+	unsigned long s[12];	/* s[0]: frame pointer */
+	struct __riscv_d_ext_state fstate;
+	unsigned long bad_cause;
+	unsigned long vstate_ctrl;
+	struct __riscv_v_ext_state vstate;
+};
+```
+我们再来看看调用switch_to的代码，发现第一个参数是需要保存的tash_struct第二个参数是需要加载的tash_struct。  
+也就是说a0 = prev ,a1 = next
+```c
+#define switch_to(prev, next, last)			\
+do {							\
+	struct task_struct *__prev = (prev);		\
+	struct task_struct *__next = (next);		\
+	if (has_fpu())					\
+		__switch_to_aux(__prev, __next);	\
+	((last) = __switch_to(__prev, __next));		\
+} while (0)
+```
+让我们以伪代码的形式来理解这段代码。
+```asm
+a0 = prev
+a1 = next 
+offset = &task_struct - &(task_struct->ra)//ra距离task_struct偏移
+ENTRY(__switch_to)
+	/* Save context into prev->thread */
+	li    a4,  offset
+	add   a3, a0, a4 //a3 = prev->thread.ra
+	add   a4, a1, a4 //a4 = next->thread.ra
+	sd ra,  a3 
+	sd sp,  8(a3)
+	sd s0,  16(a3)
+	sd s1,  24(a3)
+	sd s2,  32(a3)
+	sd s3,  40(a3)
+	sd s4,  48(a3)
+	sd s5,  56(a3)
+	sd s6,  64(a3)
+	sd s7,  72(a3)
+	sd s8,  80(a3)
+	sd s9,  88(a3)
+	sd s10, 96(a3)
+	sd s11, 104(a3)
+	/* Restore context from next->thread */
+	ld ra,  0(a4)
+	ld sp,  8(a4)
+	ld s0,  16(a4)
+	ld s1,  24(a4)
+	ld s2,  32(a4)
+	ld s3,  40(a4)
+	ld s4,  48(a4)
+	ld s5,  56(a4)
+	ld s6,  64(a4)
+	ld s7,  72(a4)
+	ld s8,  80(a4)
+	ld s9,  88(a4)
+	ld s10, 96(a4)
+	ld s11, 108(a4)
+	/* The offset of thread_info in task_struct is zero. */
+	move tp, a1 // 将线程寄存里面呢的值改为当前的task_stuct的地址
+	ret
+ENDPROC(__switch_to)
+
+```
+转化为这种代码之后，我们就非常容易理解了，只要会读riscv的汇编（请参阅lab2）就能理解代码的意思。  
+这里简单解释一下，就是将当前线程的ra，sp，s0-s11存入prev->thread部分。然后将next->thread里面的值加载进寄存器，最后切换线程指针tp。
+
+为什么只需保存这么少？因为我们只需要保存caller save的寄存器就够了，其他的寄存器是不影响的。如果需要详细理解，请参阅lab2里面的链接
 
 ## 理解进程上下文的切换机制和中断上下文切换的关系
 
