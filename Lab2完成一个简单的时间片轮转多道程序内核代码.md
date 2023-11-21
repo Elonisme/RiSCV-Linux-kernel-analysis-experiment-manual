@@ -378,24 +378,26 @@ void my_schedule(void)
     tPCB * next;
     tPCB * prev;
 
-    if(my_current_task == NULL 
-        || my_current_task->next == NULL)
+    if(my_current_task == 0
+        || my_current_task->next == 0)
     {
     	return;
     }
-    printk(KERN_NOTICE ">>>my_schedule<<<\n");
+    print(">>>my_schedule<<<\n");
     /* schedule */
     next = my_current_task->next;
     prev = my_current_task;
     if(next->state == 0)/* -1 unrunnable, 0 runnable, >0 stopped */
     {        
-    	my_current_task = next; 
-    	printk(KERN_NOTICE ">>>switch %d to %d<<<\n",prev->pid,next->pid);  
-		/* switch to next process */
-    	__switch(prev->thread,next->thread)
+    	my_current_task = next;
+        print("stacks : %p\n",task->context.sp); 
+    	print(">>>switch %d to %d<<<\n",prev->pid,next->pid);  
+        __switch(&prev->context, &next->context);
+        print("after scheduler\n"); 
     }  
     return;	
 }
+
 ```
 
 这里的`my_time_handler`函数时一个定时器中断所调用的函数，每当计算机产生一次定时器中断，就会调用这个函数。这个函数的作用是当触发了一定的定时器中断之后，就开启调度器。有了这个我们就能让我们的程序按时间片进行轮转运行了。  
@@ -428,11 +430,15 @@ volatile int my_need_sched = 0;
 void my_process(void);
 
 
-void __init my_start_kernel(void)
+void __init_my_start_kernel(void)
 {
+
+    print("run init my start kernel");
     int pid = 0;
     int i;
     /* Initialize process 0*/
+    //unsigned long stacks = 0xffffffff81601000;
+    
     task[pid].pid = pid;
     task[pid].state = 0;/* -1 unrunnable, 0 runnable, >0 stopped */
     task[pid].task_entry = task[pid].thread.ip = (unsigned long)my_process;
@@ -457,15 +463,17 @@ void __init my_start_kernel(void)
         task[i].next = task[i-1].next;
         task[i-1].next = &task[i];
     }
+    print("stacks : %p\n",task[0].thread.sp);
     /* start process 0 by task[0] */
     pid = 0;
     my_current_task = &task[pid];
 	__asm__ volatile(
-        "mv sp,%[sp]\n"
-        "mv ra,%[ra]\n"
-        "ret"
+        "mv sp,%[msp]\n"
+        "mv ra,%[mip]\n"
+        "mv s0,%[ms0]\n"
+    	"ret\n\t" 	            /* pop task[pid].thread.ip to rip */
     	: 
-    	: [ra] "r" (task[pid].thread.ra),[sp] "r" (task[pid].thread.sp)	/* input c or d mean %ecx/%edx*/
+    	:[mip] "r" (task[pid].thread.ip),[msp] "r" (task[pid].thread.sp), [ms0]"r" (task[pid].thread.s0)	/* input c or d mean %ecx/%edx*/
 	);
 } 
 
@@ -893,7 +901,7 @@ sudo make img
 
 MyKernel内核加载后将在开发板上实现一个简单的时间片轮转多道程序，如图下所示:
 
-todo:
+![running image](image.png)
 
 
 

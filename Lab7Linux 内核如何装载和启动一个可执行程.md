@@ -3,7 +3,6 @@
 ## 实验要求： 
 
 1. 理解编译链接的过程和 ELF 可执行文件格式
-
 2. 编程使用 exec库函数加载一个可执行文件，动态链接分为可执行程序装载时动态链接和运行时动态链接，编程练习动态链接库的这两种使用方式
 3. 使用 gdb 跟踪分析一个 execve 系统调用内核处理函数 sys_execve ，验证您对 Linux 系统加载可执行程序所需处理过程的理解。特别关注新的可执行程序是从哪里开始执行的？为什么 execve 系统调用返回后新的可执行程序能顺利执行？对于静态链接的可执行程序和动态链接的可执行程序 execve 系统调用返回时会有什么不同？
 
@@ -281,7 +280,7 @@ gcc -shared dllibexample.c -o libdlibexample.so
 
 当分别生成好 `libshlibexample.so` 文件和 `libdlibexample.so` 文件后，我们需要分别调用这两个文件。在`visionfive 2` 开发板中创建一个名为 `main.c` 的文件，`main.c` 的内容如下：
 
-```
+```c
 #include <stdio.h>
 #include "shlibexample.h"
 #include <dlfcn.h>

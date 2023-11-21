@@ -112,7 +112,7 @@ int WriteAsm(void){
 		    "li a2, 13\n"
 		    "li a0, 1\n"
 		    "mv a1, %[str]\n"
-	    	    "li a7, 64\n"
+	    	"li a7, 64\n"
 		    "ecall \n"
 		    :
 		    : [str] "r" (s)
@@ -238,6 +238,13 @@ graph TD;
    handle_syscall处理系统调用-->系统调用sys_write;
    系统调用sys_write--> ret_from_exception中断返回:
 ```
-
-
-
+#### 具体的流程
+由于一些限制，光靠这个gdb无法明确的知道系统调用的一些细节，在这里展开讲解一些。
+  - ecall触发trap，ecall它其实是跳转到一个地址，这个地址被存在stvec寄存器中（请了解[RISCV特权架构指令](http://riscvbook.com/chinese/RISC-V-Reader-Chinese-v2p1.pdf)）
+  - 这个stvec的地址在操作系统的启动的时候就已经被设置好了在`arch/riscv/kernel/head.S `里面，它就是handle_exception。
+  - handle_execption会保存用户的上下文，然后把内核上下文写入寄存器（包括页表）
+  - sstatuc、sepc、stval、scause、sscratch 这 5 个 csr 寄存器（请了解[RISCV特权架构指令](http://riscvbook.com/chinese/RISC-V-Reader-Chinese-v2p1.pdf)）存储了触发trap的信息。
+  - scause里面存储的是出发trap的信息，scause 寄存器最高位含义如下：最高位=1：interrupts 最高位=0：exceptions，如scause的值大于0那么就是由excptions触发，如果小于0，那么就是一个中断。我们这里是大于0的。
+  - 接下里判断scause是否等于EXC_SYSCALL 这个值是8 ，也就是当 scause==8 时，就表示由 sys_call 触发的 trap,从而进入handle_syscall
+  - handle_syscall 里面会将spec也就是出错的地址（我们这里是ecall的地址）+4并且存储下来，用于正确返回（sret的时候是ret到下一个ecall的地址防止无限循环），然后根据a7里面的值确定是哪个系统调用。找到相应的系统调用,返回。注意在 handle_syscall 里跳转到实际的系统调用函数时把返回地址设置成了 ret_from_syscall。所以上述的 sys_write 函数返回后会跳转到 ret_from_syscall 继续执行。
+  - ret_from_syscall会将保存的用户模式的上下文中的a0（返回值）切换为系统调用运行之后的返回值，然后恢复现场，最后使用sret来回到用户态
