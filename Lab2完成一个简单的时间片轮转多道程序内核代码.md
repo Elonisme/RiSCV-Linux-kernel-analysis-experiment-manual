@@ -153,6 +153,7 @@ cd soft_3rdpart && git checkout JH7110_VisionFive2_devel && cd ..
  - The RISC-V Instruction Set Manual([Volume I](https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf) , [Volume II](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf)) 
  - [ABI for RISC-V](https://github.com/riscv-non-isa/riscv-elf-psabi-doc)  
    
+
 我们这里只是简单的了解一下riscv寄存器的 RISC-V 应用程序二进制接口（ABI）  
 ![寄存器](image.png)  
 这些寄存器是riscv的通用寄存器，一共有32个，在这一章我们可能会用到`ra寄存器`：保存函数返回地址。`sp寄存器`：保存函数的栈指针。
@@ -168,7 +169,7 @@ cd soft_3rdpart && git checkout JH7110_VisionFive2_devel && cd ..
 int main(){
 	printf("hello world");
 }
-``` 
+```
 我们编译好之后用objdump反汇编一下，我这里去除掉了一些不需要的信息,只保留main函数的部分。
 ```shell
 hello:     file format elf64-littleriscv
@@ -287,7 +288,7 @@ void my_schedule(void);
  - thread：用来保存程序运行时的寄存器状态，即现场。
  - tash_entry: 用来表示程序的入口地址，简单理解相当于我们平时编程的main函数。
  - next： 表示下一个程序的地址。  
-  
+
 
 ##### my_schdule
 
@@ -901,8 +902,6 @@ sudo make img
 
 MyKernel内核加载后将在开发板上实现一个简单的时间片轮转多道程序，如图下所示:
 
-![running image](image.png)
-
-
+![mmexport1701419651344](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/mmexport1701419651344.png)
 
  
