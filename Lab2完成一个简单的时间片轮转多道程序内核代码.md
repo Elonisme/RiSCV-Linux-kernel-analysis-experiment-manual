@@ -904,4 +904,193 @@ MyKernel内核加载后将在开发板上实现一个简单的时间片轮转多
 
 ![mmexport1701419651344](https://ellog.oss-cn-beijing.aliyuncs.com/ossimgs/mmexport1701419651344.png)
 
- 
+
+
+## 用协程完成实验
+注意根据内核版本不同，我们的程序存在无法正确运行的可能，由于并未完全阅读过linux内核代码，这里可能存在一些我们所不知道的检查。所以在我们使用自己的栈的时候，可能会出现栈溢出的情况。所以我们这里提供另一种实验方法--协程。  
+协程。协程又被叫做轻量级线程，它与线程很像，协程的切换的方式是和线程切换一模一样的，只不过协程的切换是在用户态下面进行的，并不是内核态。而协程的切换也不会导致内核线程的切换。协程可以为程序带来巨大的性能提升，而且它切换的资源非常少  
+讲回我们自己的程序，我们会发现，其实我们自己在内核态写的多道程序轮转调用实际上完全可以放在用户态用协程来运行，甚至不需要修改代码。只需要组合起来，然后写个main函数，然后编译运行就行了。
+```c
+#include <stdio.h>
+#include <string.h>
+#define MAX_TASK_NUM 4
+#define KERNEL_STACK_SIZE 256
+/* CPU-specific state of this task */
+typedef struct Thread {
+  unsigned long s0;
+  unsigned long ip;
+  unsigned long sp;
+} tThread;
+
+typedef struct AThread {
+  // unsigned long       s0;
+  unsigned long ra;
+  unsigned long sp;
+  unsigned long s0;
+  unsigned long s1;
+  unsigned long s2;
+  unsigned long s3;
+  unsigned long s4;
+  unsigned long s5;
+  unsigned long s6;
+  unsigned long s7;
+  unsigned long s8;
+  unsigned long s9;
+  unsigned long s10;
+  unsigned long s11;
+} aThread;
+
+typedef struct PCB {
+  int pid;
+  volatile long state; /* -1 unrunnable, 0 runnable, >0 stopped */
+  unsigned long stack[KERNEL_STACK_SIZE];
+  /* CPU-specific state of this task */
+  struct Thread thread;
+  struct AThread context;
+  unsigned long task_entry;
+  struct PCB *next;
+} tPCB;
+
+tPCB task[MAX_TASK_NUM];
+tPCB *my_current_task = 0;
+volatile int my_need_sched = 0;
+
+void my_process(void);
+void my_schedule(void);
+
+extern void __switch(aThread *old, aThread *new);
+
+void __init_my_start_kernel(void) {
+
+  printf("run init my start kernel");
+  int pid = 0;
+  int i;
+  /* Initialize process 0*/
+  // unsigned long stacks = 0xffffffff81601000;
+
+  task[pid].pid = pid;
+  task[pid].state = 0; /* -1 unrunnable, 0 runnable, >0 stopped */
+  task[pid].task_entry = task[pid].thread.ip = (unsigned long)my_process;
+  task[pid].thread.sp = (unsigned long)&task[pid].stack[KERNEL_STACK_SIZE - 1];
+  task[pid].thread.s0 = (unsigned long)&task[pid].stack[KERNEL_STACK_SIZE - 1];
+  task[pid].next = &task[pid];
+
+  task[pid].context.ra = (unsigned long)my_process;
+  task[pid].context.s0 = (unsigned long)&task[pid].stack[KERNEL_STACK_SIZE - 1];
+  task[pid].context.sp = (unsigned long)&task[pid].stack[KERNEL_STACK_SIZE - 1];
+
+  /*fork more process */
+  for (i = 1; i < MAX_TASK_NUM; i++) {
+    memcpy(&task[i], &task[0], sizeof(tPCB));
+    task[i].pid = i;
+    task[i].thread.sp = (unsigned long)(&task[i].stack[KERNEL_STACK_SIZE - 1]);
+
+    task[i].context.s0 = (unsigned long)&task[i].stack[KERNEL_STACK_SIZE - 1];
+    task[i].context.sp = (unsigned long)&task[i].stack[KERNEL_STACK_SIZE - 1];
+
+    task[i].next = task[i - 1].next;
+    task[i - 1].next = &task[i];
+  }
+  printf("stacks : %p\n", task[0].thread.sp);
+  /* start process 0 by task[0] */
+  pid = 0;
+  my_current_task = &task[pid];
+  __asm__ volatile(
+      "mv sp,%[msp]\n"
+      "mv ra,%[mip]\n"
+      "mv s0,%[ms0]\n"
+      "ret\n\t" /* pop task[pid].thread.ip to rip */
+      :
+      : [mip] "r"(task[pid].thread.ip), [msp] "r"(task[pid].thread.sp),
+        [ms0] "r"(task[pid].thread.s0) /* input c or d mean %ecx/%edx*/
+  );
+}
+
+static int i = 0;
+
+void my_process(void) {
+
+  while (1) {
+    i++;
+    if (i % 10000000 == 0) {
+      printf("this is process %d -\n", my_current_task->pid);
+      if (my_need_sched == 0) {
+
+        my_need_sched = 0;
+        my_schedule();
+      }
+      printf("this is process %d +\n", my_current_task->pid);
+    }
+  }
+}
+
+void my_schedule(void) {
+  tPCB *next;
+  tPCB *prev;
+
+  if (my_current_task == 0 || my_current_task->next == 0) {
+    return;
+  }
+  printf(">>>my_schedule<<<\n");
+  /* schedule */
+  next = my_current_task->next;
+  prev = my_current_task;
+  if (next->state == 0) /* -1 unrunnable, 0 runnable, >0 stopped */
+  {
+    my_current_task = next;
+    printf(">>>switch %d to %d<<<\n", prev->pid, next->pid);
+    __switch(&prev->context, &next->context);
+    printf("after scheduler\n");
+  }
+  return;
+}
+int main() {
+  printf("hello world\n");
+  __init_my_start_kernel();
+}
+```
+```asm
+.global __switch
+__switch:
+    sd ra,0(a0)
+    sd sp,8(a0)
+    sd s0,16(a0)
+    sd s1,24(a0)
+    sd s2,32(a0)
+    sd s3,40(a0)
+    sd s4,48(a0)
+    sd s5,56(a0)
+    sd s6,64(a0)
+    sd s7,72(a0)
+    sd s8,80(a0)
+    sd s9,88(a0)
+    sd s10,96(a0)
+    sd s11,104(a0)
+
+    ld ra, 0(a1)
+    ld sp, 8(a1)
+    ld s0, 16(a1)
+    ld s1, 24(a1)
+    ld s2, 32(a1)
+    ld s3, 40(a1)
+    ld s4, 48(a1)
+    ld s5, 56(a1)
+    ld s6, 64(a1)
+    ld s7, 72(a1)
+    ld s8, 80(a1)
+    ld s9, 88(a1)
+    ld s10, 96(a1)
+    ld s11, 104(a1)
+    ret
+```
+
+```makefile
+mymain:mymain.c
+	riscv64-linux-gnu-gcc -c ./mymain.c -o mymain.o
+switch:switch.s
+	riscv64-linux-gnu-gcc -c ./switch.s -o switch.o
+all: mymain switch
+	riscv64-linux-gnu-gcc ./mymain.o ./switch.o -o ./main
+```
+将代码准备好之后，我们只需要make all就可以在本目录下生成一个名为`main`的二进制文件，让我们来运行它，发现和我们想得一模一样。非常好！现在我们已经能理解线程是怎么切换的了。
+### 运行截图
